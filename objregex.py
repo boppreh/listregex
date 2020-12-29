@@ -121,10 +121,14 @@ def end() -> PatternType[Item]:
     """ Matches the end of the items list. """
     return lambda match: match.end == len(match.items)
 
-#def either(*options):
-#    def wrapper(match, items):
-#        for option in options:
-#            result = _next_match(option, match, items)
+def either(*patterns: PatternType[Item]) -> PatternType[Item]:
+    """ Applies the given pattern, skipping it if it fails. """
+    def wrapper(old_match: Match[Item]) -> Match:
+        for pattern in patterns:
+            new_match = _next_match(pattern, old_match)
+            if new_match is not None:
+                return new_match
+    return wrapper
 
 def optional(pattern: PatternType[Item]) -> PatternType[Item]:
     """ Applies the given pattern, skipping it if it fails. """
@@ -203,6 +207,7 @@ def search(patterns: PatternType[Item], items: Sequence[Item], start: int = 0) -
 if __name__ == '__main__':
     @no_type_check
     def tests():
+        assert list(findall(either(1, 2), [1, 2, 3])) == [[1], [2]]
         assert fullmatch([1, 2, 3], [1, 2, 3]).end == 3
         assert search([2, 3], [1, 2, 3]).start == 1
         assert fullmatch([1, any(), 3], [1, 2, 3])
