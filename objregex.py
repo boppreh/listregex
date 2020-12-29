@@ -1,4 +1,4 @@
-from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, Union, Generic, no_type_check
+from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, Union, Generic, Tuple, no_type_check
 
 class NoMoreItems(Exception):
     """
@@ -47,8 +47,8 @@ class Match(Generic[Item]):
     @property
     def matched(self) -> Sequence[Item]:
         """
-        List of matched items (potentially empty for patterns with optional
-        patterns).
+        List of matched items (potentially empty for patterns with `optional`
+        and `lookahead`).
         """
         return self.items[self.start:self.end]
 
@@ -85,7 +85,7 @@ def _next_match(pattern: PatternType[Item], match: Match[Item]) -> Optional[Matc
         try:
             result = pattern(match)
         except NoMoreItems:
-            # Removes the need to sprinkle "m.has_next" all over custom patterns.
+            # Removes the need to sprinkle "m.has_next" all over custom functions.
             result = None
 
         if isinstance(result, Match):
@@ -176,41 +176,88 @@ def zero_or_more(pattern: PatternType[Item]) -> PatternType[Item]:
 # Matchers #
 ############
 
-def match(patterns: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
+def match(pattern: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
     """
     Returns the longest match from the beginning of the items list. Use
     `fullmatch` to guarantee that the full list has been matched.
     """
-    return _next_match(patterns, Match(items, 0, 0))
+    return _next_match(pattern, Match(items, 0, 0))
 
-def fullmatch(patterns: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
+def fullmatch(pattern: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
     """
-    Tries to match all items with the given patterns.
+    Tries to match all items with the given pattern.
     """
-    match = _next_match(patterns, Match(items, 0, 0))
+    match = _next_match(pattern, Match(items, 0, 0))
     return match if match and not match.has_next else None
 
-def findall(patterns: PatternType[Item], items: Sequence[Item]) -> Iterator[Sequence[Item]]:
+def searchall(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Match[Item]]:
     """
-    Returns all non-overlapping matched items from the list of items.
+    Returns all non-overlapping matches from the list of items.
     """
     start = 0
     while start < len(items):
-        match = search(patterns, items, start=start)
+        match = search(pattern, items, start=start)
         if not match:
             return
-        yield match.matched
+        yield match
         start = match.end
 
-def search(patterns: PatternType[Item], items: Sequence[Item], start: int = 0) -> Optional[Match[Item]]:
+def findall(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Sequence[Item]]:
+    """ Returns all non-overlapping matched items from the list of items. """
+    return (match.matched for match in searchall(pattern, items))
+
+def search(pattern: PatternType[Item], items: Sequence[Item], start: int = 0) -> Optional[Match[Item]]:
     """
     Returns the first match from the list of items.
     """
     for i in range(start, len(items)):
-        match = _next_match(patterns, Match(items, i, i))
+        match = _next_match(pattern, Match(items, i, i))
         if match:
             return match
     return None
+
+def sub(pattern: PatternType[Item], replacement: Sequence[Item], items: Sequence[Item], count: int = 0) -> Sequence[Item]:
+    """
+    Replaces every match of `pattern` in `items` with `replacement`, up to
+    `count` times (or as many times as possible if count is 0).
+    """
+    new_items, n_subs = subn(pattern, replacement, items)
+    return new_items
+
+def subn(pattern: PatternType[Item], replacement: Sequence[Item], items: Sequence[Item], count: int = 0) -> Tuple[Sequence[Item], int]:
+    """
+    Replaces every match of `pattern` in `items` with `replacement`, up to
+    `count` times (or as many times as possible if count is 0). Returns
+    the items list with replacements applied and number of replacements made.
+    """
+    items_copy = list(items)
+    matches = list(searchall(pattern, items))
+    if count > 0:
+        matches = matches[:count]
+    for match in reversed(matches):
+        if callable(replacement):
+            new_value = replacement(match)
+        else:
+            new_value = replacement
+        items_copy[match.start:match.end] = new_value
+    return items_copy, len(matches)
+
+def split(pattern: PatternType[Item], items: Sequence[Item], maxsplit: int = 0) -> Sequence[Sequence[Item]]:
+    """
+    Returns slices of `items`, split on every match of `pattern`, up to
+    `maxsplit` times (unless zero). The matched items themselves are not
+    included.
+    """
+    matches = list(searchall(pattern, items))
+    if maxsplit > 0:
+        matches = matches[:maxsplit]
+    last_end = 0
+    result = []
+    for match in matches:
+        result.append(items[last_end:match.start])
+        last_end = match.end
+    result.append(items[last_end:])
+    return result
 
 if __name__ == '__main__':
     @no_type_check
@@ -224,6 +271,7 @@ if __name__ == '__main__':
         assert list(findall(lambda m: 0 < m.next < 3, [0, 1, 2, 3])) == [[1], [2]]
         assert search([1, repeat([2, optional(3)])], [0, 1, 2, 3, 2, 4]).matched == [1, 2, 3, 2]
         assert search(repeat([1, 2]), [0, 1, 2, 1, 2, 3, 2, 4]).matched == [1, 2, 1, 2]
+        assert sub([1, 2], [], [0, 1, 2, 1, 2, 3]) == [0, 3]
 
         from datetime import date, timedelta
         from collections import namedtuple
