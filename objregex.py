@@ -10,7 +10,7 @@ class Match(Generic[Item]):
     """
     A subsequence of items that match a certain pattern.
     """
-    def __init__(self, items: Sequence[Item], start: int, end: int) -> None:
+    def __init__(self, items: Sequence[Item], start: int = 0, end: int = 0) -> None:
         self.items = items
         self.start = start
         self.end = end
@@ -48,7 +48,7 @@ class Match(Generic[Item]):
     def matched(self) -> Sequence[Item]:
         """
         List of matched items (potentially empty for patterns with optional
-        matchers).
+        patterns).
         """
         return self.items[self.start:self.end]
 
@@ -64,122 +64,141 @@ class Match(Generic[Item]):
     def __repr__(self) -> str:
         return f'Match({", ".join(str(item) for item in self.matched)})'
 
+LeafPatternType = Union[Item, Callable[[Match[Item]], Union[bool, int, None, Match[Item]]]]
+PatternType = Union[LeafPatternType[Item], Sequence[LeafPatternType[Item]]]
 
-MatcherType = Union[Item, Callable[[Match[Item]], Union[bool, int, Optional[Match[Item]]]]]
-
-def _test_one(next_matcher: MatcherType[Item], match: Match[Item]) -> Optional[Match[Item]]:
+def _match_sequence(pattern: Sequence[LeafPatternType[Item]], match: Match[Item]) -> Optional[Match[Item]]:
     """
-    Test a single matcher against the items after the current match.
+    Returns the match for a pattern that is a sequence of sub-patterns.
     """
-    if not callable(next_matcher):
-        return match.advance(1) if match.has_next and match.next == next_matcher else None
-
-    try:
-        result = next_matcher(match)
-    except NoMoreItems:
-        # Removes the need to sprinkle "m.has_next" all over custom matchers.
-        result = None
-
-    if isinstance(result, Match):
-        return result
-    elif result == 0 or result is None:
-        return None
-    else:
-        return match.advance(result)
-
-def _general_match(matchers: Sequence[MatcherType[Item]], items: Sequence[Item], start: int = 0) -> Optional[Match[Item]]:
-    """
-    Test a sequence of matchers against a list of items, with an optional start
-    index offset.
-    """
-    match = Match(items, start, start)
-    for matcher in matchers:
-        match = _test_one(matcher, match)
-        if match is None: break
+    for subpattern in pattern:
+        new_match = _next_match(subpattern, match)
+        if new_match is None: return None
+        match = new_match
     return match
 
-############################
-# Start of user functions. #
-############################
+def _next_match(pattern: PatternType[Item], match: Match[Item]) -> Optional[Match[Item]]:
+    """
+    Test a single pattern against the items after the current match.
+    """
+    if callable(pattern):
+        try:
+            result = pattern(match)
+        except NoMoreItems:
+            # Removes the need to sprinkle "m.has_next" all over custom patterns.
+            result = None
 
-def any() -> MatcherType[Item]:
+        if isinstance(result, Match):
+            return result
+        elif result == 0 or result is None:
+            return None
+        else:
+            return match.advance(result)
+    else:
+        if isinstance(pattern, (tuple, list)):
+            # A pattern that looks like a list could either be a literal list,
+            # in case the items themselves are lists, or a sequence of patterns.
+            # Try matching it as a sequence of patterns first, and return that
+            # if it works.
+            result = _match_sequence(pattern, match)
+            if result:
+                return result
+        return match.advance(1) if match.has_next and match.next == pattern else None
+
+#######################
+# Pattern combinators #
+#######################
+
+def any() -> PatternType[Item]:
     """"Matches any single item. """
     return lambda match: True
 
-def start() -> MatcherType[Item]:
+def start() -> PatternType[Item]:
     """ Matches the start of the items list. """
     return lambda match: match.end == 0
 
-def end() -> MatcherType[Item]:
+def end() -> PatternType[Item]:
     """ Matches the end of the items list. """
     return lambda match: match.end == len(match.items)
 
 #def either(*options):
 #    def wrapper(match, items):
 #        for option in options:
-#            result = _test_one(option, match, items)
+#            result = _next_match(option, match, items)
 
-def optional(matcher: MatcherType[Item]) -> MatcherType[Item]:
-    """ Applies the given matcher, skipping it if it fails. """
-    def wrapper(old_match):
-        new_match = _test_one(matcher, old_match)
+def optional(pattern: PatternType[Item]) -> PatternType[Item]:
+    """ Applies the given pattern, skipping it if it fails. """
+    def wrapper(old_match: Match[Item]) -> Match:
+        new_match = _next_match(pattern, old_match)
         return old_match if new_match is None else new_match
     return wrapper
 
-def repeat(matcher, min_n=1, max_n=None) -> MatcherType[Item]:
+def repeat(pattern: PatternType[Item], min_n: int = 1, max_n: Optional[int] = None) -> PatternType[Item]:
     """
-    Repeats the matcher as many times as it'll match (greedy), if the number
+    Repeats the pattern as many times as it'll match (greedy), if the number
     of repetitions if above `min_n` and below `max_n` (if not None)
     """
-    def wrapper(match):
+    def wrapper(match: Match[Item]) -> Optional[Match]:
         for _ in range(min_n):
-            match = _test_one(matcher, match)
-            if match is None:
+            new_match = _next_match(pattern, match)
+            if new_match is None:
                 return None
+            match = new_match
         for _ in range(max_n - min_n if max_n is not None else len(match.items) - match.end):
-            new_match = _test_one(matcher, match)
+            new_match = _next_match(pattern, match)
             if new_match is None or new_match == match:
                 return match
             match = new_match
         return match
     return wrapper
 
-def one_or_more(matcher: MatcherType[Item]) -> MatcherType[Item]:
-    """ Matches the given matcher one or more times (greedy). """
-    return repeat(matcher, min_n=1)
+def one_or_more(pattern: PatternType[Item]) -> PatternType[Item]:
+    """ Matches the given pattern one or more times (greedy). """
+    return repeat(pattern, min_n=1)
 
-def zero_or_more(matcher: MatcherType[Item]) -> MatcherType[Item]:
-    """ Matches the given matcher zero or more times (greedy). """
-    return repeat(matcher, min_n=0)
+def zero_or_more(pattern: PatternType[Item]) -> PatternType[Item]:
+    """ Matches the given pattern zero or more times (greedy). """
+    return repeat(pattern, min_n=0)
 
-def fullmatch(matchers: Sequence[MatcherType[Item]], items: Sequence[Item]) -> Optional[Match[Item]]:
+############
+# Matchers #
+############
+
+def match(patterns: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
     """
-    Tries to match all items with the given matchers.
+    Returns the longest match from the beginning of the items list. Use
+    `fullmatch` to guarantee that the full list has been matched.
     """
-    match = _general_match(matchers, items)
+    return _next_match(patterns, Match(items, 0, 0))
+
+def fullmatch(patterns: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
+    """
+    Tries to match all items with the given patterns.
+    """
+    match = _next_match(patterns, Match(items, 0, 0))
     return match if match and not match.has_next else None
 
-def findall(matchers: Sequence[MatcherType[Item]], items: Sequence[Item]) -> Iterator[Match[Item]]:
+def findall(patterns: PatternType[Item], items: Sequence[Item]) -> Iterator[Sequence[Item]]:
     """
-    Returns all non-overlapping matches from the list of items.
+    Returns all non-overlapping matched items from the list of items.
     """
     start = 0
     while start < len(items):
-        match = _general_match(matchers, items, start=start)
-        if match:
-            yield match
-            start = match.end
-        else:
-            start += 1
+        match = search(patterns, items, start=start)
+        if not match:
+            return
+        yield match.matched
+        start = match.end
 
-def search(matchers: Sequence[MatcherType[Item]], items: Sequence[Item]) -> Optional[Match[Item]]:
+def search(patterns: PatternType[Item], items: Sequence[Item], start: int = 0) -> Optional[Match[Item]]:
     """
     Returns the first match from the list of items.
     """
-    try:
-        return next(findall(matchers, items))
-    except StopIteration:
-        return None
+    for i in range(start, len(items)):
+        match = _next_match(patterns, Match(items, i, i))
+        if match:
+            return match
+    return None
 
 if __name__ == '__main__':
     @no_type_check
@@ -188,6 +207,9 @@ if __name__ == '__main__':
         assert search([2, 3], [1, 2, 3]).start == 1
         assert fullmatch([1, any(), 3], [1, 2, 3])
         assert search([one_or_more(lambda m: 0 < m.next < 3)], [0, 1, 2, 3]).matched == [1, 2]
+        assert list(findall(lambda m: 0 < m.next < 3, [0, 1, 2, 3])) == [[1], [2]]
+        assert search([1, repeat([2, optional(3)])], [0, 1, 2, 3, 2, 4]).matched == [1, 2, 3, 2]
+        assert search(repeat([1, 2]), [0, 1, 2, 1, 2, 3, 2, 4]).matched == [1, 2, 1, 2]
 
         from datetime import date, timedelta
         from collections import namedtuple
@@ -207,4 +229,5 @@ if __name__ == '__main__':
             lambda m: m.next.date - m[0].date < timedelta(days=2),
         ]
         assert search(pattern, logins)[1].country == 'Russia'
+        print('Test passed.')
     tests()
