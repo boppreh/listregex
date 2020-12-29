@@ -94,9 +94,8 @@ def _general_match(matchers: Sequence[MatcherType[Item]], items: Sequence[Item],
     """
     match = Match(items, start, start)
     for matcher in matchers:
-        new_match = _test_one(matcher, match)
-        if new_match is None: break
-        match = new_match
+        match = _test_one(matcher, match)
+        if match is None: break
     return match
 
 ############################
@@ -208,3 +207,4 @@ if __name__ == '__main__':
             lambda m: m.next.date - m[0].date < timedelta(days=2),
         ]
         assert search(pattern, logins)[1].country == 'Russia'
+    tests()
