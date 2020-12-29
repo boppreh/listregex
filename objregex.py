@@ -1,4 +1,4 @@
-from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, no_type_check
+from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, Union, no_type_check
 Item = TypeVar("Item")
 
 class NoMoreItems(Exception):
@@ -64,7 +64,11 @@ class Match:
     def __repr__(self) -> str:
         return f'Match({", ".join(str(item) for item in self.matched)})'
 
-def _test_one(next_matcher: Any, match: Match) -> Optional[Match]:
+
+MatcherResultType = Union[bool, int, Optional[Match]]
+MatcherType = Union[Item, Callable[[Match], MatcherResultType]]
+
+def _test_one(next_matcher: MatcherType, match: Match) -> Optional[Match]:
     """
     Test a single matcher against the items after the current match.
     """
@@ -84,7 +88,7 @@ def _test_one(next_matcher: Any, match: Match) -> Optional[Match]:
     else:
         return match.advance(result)
 
-def _general_match(matchers: Sequence[Any], items: Sequence[Item], start: int = 0) -> Optional[Match]:
+def _general_match(matchers: Sequence[MatcherType], items: Sequence[Item], start: int = 0) -> Optional[Match]:
     """
     Test a sequence of matchers against a list of items, with an optional start
     index offset.
@@ -117,7 +121,7 @@ def end() -> Callable[[Match], bool]:
 #        for option in options:
 #            result = _test_one(option, match, items)
 
-def optional(matcher: Any) -> Callable[[Match], Match]:
+def optional(matcher: MatcherType) -> Callable[[Match], Match]:
     """ Applies the given matcher, skipping it if it fails. """
     def wrapper(old_match):
         new_match = _test_one(matcher, old_match)
@@ -142,22 +146,22 @@ def repeat(matcher, min_n=1, max_n=None) -> Callable[[Match], Optional[Match]]:
         return match
     return wrapper
 
-def one_or_more(matcher: Any) -> Callable[[Match], Optional[Match]]:
+def one_or_more(matcher: MatcherType) -> Callable[[Match], Optional[Match]]:
     """ Matches the given matcher one or more times (greedy). """
     return repeat(matcher, min_n=1)
 
-def zero_or_more(matcher: Any) -> Callable[[Match], Optional[Match]]:
+def zero_or_more(matcher: MatcherType) -> Callable[[Match], Optional[Match]]:
     """ Matches the given matcher zero or more times (greedy). """
     return repeat(matcher, min_n=0)
 
-def fullmatch(matchers: Sequence[Any], items: Sequence[Item]) -> Optional[Match]:
+def fullmatch(matchers: Sequence[MatcherType], items: Sequence[Item]) -> Optional[Match]:
     """
     Tries to match all items with the given matchers.
     """
     match = _general_match(matchers, items)
     return match if match and not match.has_next else None
 
-def findall(matchers: Sequence[Any], items: Sequence[Item]) -> Iterator[Match]:
+def findall(matchers: Sequence[MatcherType], items: Sequence[Item]) -> Iterator[Match]:
     """
     Returns all non-overlapping matches from the list of items.
     """
@@ -170,7 +174,7 @@ def findall(matchers: Sequence[Any], items: Sequence[Item]) -> Iterator[Match]:
         else:
             start += 1
 
-def search(matchers: Sequence[Any], items: Sequence[Item]) -> Optional[Match]:
+def search(matchers: Sequence[MatcherType], items: Sequence[Item]) -> Optional[Match]:
     """
     Returns the first match from the list of items.
     """
