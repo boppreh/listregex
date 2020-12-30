@@ -1,4 +1,4 @@
-from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, Union, Generic, Tuple, no_type_check
+from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, Union, Generic, Tuple, Dict, no_type_check
 
 class NoMoreItems(Exception):
     """
@@ -62,7 +62,7 @@ class Match(Generic[Item]):
         return isinstance(other, Match) and self.items == other.items and self.start == other.start and self.end == other.end
 
     def __repr__(self) -> str:
-        return f'Match({", ".join(str(item) for item in self.matched)})'
+        return f'Match({repr(self.matched)})'
 
 LeafPatternType = Union[Item, Callable[[Match[Item]], Union[bool, int, Iterator[Match[Item]]]]]
 PatternType = Union[LeafPatternType[Item], Sequence[LeafPatternType[Item]]]
@@ -173,28 +173,37 @@ def negate(pattern: PatternType[Item]) -> PatternType[Item]:
         yield match.advance(1)
     return wrapper
 
-# def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternType[Item]:
-#     """ Matches `open` until the next matching `close`. """
-#     def wrapper(match: Match[Item]) -> Iterator[Match]:
-#         new_match = _next_match(open, match)
-#         if not new_match: return None
-#         match = new_match
-
-#         depth = 1
-#         while depth != 0 and match.has_next:
-#             if new_match := _next_match(open, match):
-#                 depth += 1
-#             elif new_match := _next_match(close, match):
-#                 depth -= 1
-#             else:
-#                 new_match = match.advance(1)
-#             match = new_match
-#         return match if depth == 0 else None
-#     return wrapper
+def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternType[Item]:
+    """ Matches `open` until the next balanced pair of `close`. """
+    def wrapper(match: Match[Item]) -> Iterator[Match]:
+        # TODO: make it not rely on the high-level `scan` function.
+        depth = 0
+        for name, new_match in scan({'open': open, 'close': close, 'any': any()}, match.items[match.end:]):
+            if name == 'any' and depth == 0:
+                return
+            elif name == 'open':
+                depth += 1
+            elif name == 'close':
+                depth -= 1
+                if depth < 0:
+                    return
+                if depth == 0:
+                    yield Match(match.items, match.start, match.end + new_match.end)
+                    return
+    return wrapper
 
 ############
 # Matchers #
 ############
+
+def scan(patterns: Dict[str, PatternType[Item]], items: Sequence[Item]) -> Iterator[Tuple[str, Match[Item]]]:
+    match = Match(items, 0, 0)
+    while match.end < len(items):
+        matches = [(name, new_match) for name, pattern in patterns.items() for new_match in _next_match(pattern, match)]
+        if not matches: return
+        name, new_match = matches[0]
+        yield name, Match(items, match.end, new_match.end)
+        match = new_match
 
 def match(pattern: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
     """
@@ -295,6 +304,7 @@ if __name__ == '__main__':
         assert search([1, repeat([2, optional(3)])], [0, 1, 2, 3, 2, 4]).matched == [1, 2, 3, 2]
         assert search(repeat([1, 2]), [0, 1, 2, 1, 2, 3, 2, 4]).matched == [1, 2, 1, 2]
         assert sub([1, 2], [], [0, 1, 2, 1, 2, 3]) == [0, 3]
+        assert search(matching_pair('(', ')'), 'ab(c(d()e)f)').matched == '(c(d()e)f)'
 
         from datetime import date, timedelta
         from collections import namedtuple
