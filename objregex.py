@@ -172,6 +172,15 @@ def zero_or_more(pattern: PatternType[Item]) -> PatternType[Item]:
     """ Matches the given pattern zero or more times (greedy). """
     return repeat(pattern, min_n=0)
 
+def negate(pattern: PatternType[Item]) -> PatternType[Item]:
+    """
+    Matches any single item except if it would have matched the given pattern.
+    """
+    def wrapper(match: Match[Item]) -> Optional[Match]:
+        new_match = _next_match(pattern, match)
+        return match.advance(1) if new_match is None else None
+    return wrapper
+
 ############
 # Matchers #
 ############
