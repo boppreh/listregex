@@ -2,6 +2,8 @@
 
 `objregex` implements the same functions as Python's stdlib `re` module, but instead of operating only on strings, it operates on lists of arbitrary objects.
 
+Currently uses a naive regex engine, with greedy operators and no backtrack.
+
 ```python
 from objregex import *
 
