@@ -44,4 +44,9 @@ search(pattern, logins)[1].country
 # Collapses repeated elements.
 sub([any(), zero_or_more(lambda m: m.next == m[0])], lambda m: [m[0]], [1, 2, 3, 3, 4, 5, 5])
 # [1, 2, 3, 4, 5]
+
+# Finds all items that are bigger than the next, or at the `end` of the list.
+# Uses `lookahead` to allow the next item to also be matched.
+findall([any(), either(end(), lookahead(lambda m: m[0] > m.next))], [1, 2, 1, 3, 2, 4, 3, 1])
+# [[2], [3], [4], [3], [1]]
 ```
