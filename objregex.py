@@ -181,6 +181,25 @@ def negate(pattern: PatternType[Item]) -> PatternType[Item]:
         return match.advance(1) if new_match is None else None
     return wrapper
 
+def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternType[Item]:
+    """ Matches `open` until the next matching `close`. """
+    def wrapper(match: Match[Item]) -> Optional[Match]:
+        new_match = _next_match(open, match)
+        if not new_match: return None
+        match = new_match
+
+        depth = 1
+        while depth != 0 and match.has_next:
+            if new_match := _next_match(open, match):
+                depth += 1
+            elif new_match := _next_match(close, match):
+                depth -= 1
+            else:
+                new_match = match.advance(1)
+            match = new_match
+        return match if depth == 0 else None
+    return wrapper
+
 ############
 # Matchers #
 ############
