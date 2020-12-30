@@ -45,6 +45,10 @@ search(pattern, logins)[1].country
 sub([any(), zero_or_more(lambda m: m.next == m[0])], lambda m: [m[0]], [1, 2, 3, 3, 4, 5, 5])
 # [1, 2, 3, 4, 5]
 
+# Parses a binary array where elements are encoded as [length, *values].
+findall(lambda m: int(m[0])+1, b'\x00\x01\x55\x02\x66\x66\x00')
+# [b'\x00', b'\x01\x55', b'\x02\x66\x66', b'\x00']
+
 # Finds all items that are bigger than the next, or at the `end` of the list.
 # Uses `lookahead` to allow the next item to also be matched.
 findall([any(), either(end(), lookahead(lambda m: m[0] > m.next))], [1, 2, 1, 3, 2, 4, 3, 1])
