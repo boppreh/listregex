@@ -2,7 +2,18 @@
 
 `objregex` implements the same functions as Python's stdlib `re` module, but instead of operating only on strings, it operates on lists of arbitrary objects.
 
-Currently uses a naive regex engine, with greedy operators and no backtrack.
+Currently uses a naive regex engine, with greedy operators and backtracking.
+
+Patterns can be:
+
+- A literal value. Example: `search(1, [1, 2])` matches the first value.
+- A list/tuple of patterns, where the sub-patterns are matched sequentially. Example: `search([1, 2], [0, 1, 2])`.
+- A value from a helper function, such as `optional(pattern)`, `zero_or_more(pattern)`, `end()`. Example: `findall(repeat(1), my_list)` finds all strings of 1's.
+- A function that takes one parameter, the current match, and return the number of following items that should be added to be match (note that `True == 1` and `False == 0`). Examples:
+    - `lambda m: 2` blindly accepts the next two items, such that `findall(lambda m: 2, items)` returns the items divided in pairs.
+    - `lambda m: m.next % 2 == 0` checks if the next item is even, and if so, extends the match to include it.
+    - `lambda m: m.items.count(m.next) >= 1` matches all items that occur more than once.
+    - `lambda m: m[0] > m.next` compares the first matched item with the next.
 
 ```python
 from objregex import *
