@@ -1,6 +1,6 @@
-# objregex
+# listregex
 
-`objregex` implements the same functions as Python's stdlib `re` module, but instead of operating only on strings, it operates on lists of arbitrary objects.
+`listregex` implements the same functions as Python's stdlib `re` module, but instead of operating only on strings, it operates on lists of arbitrary objects.
 
 Currently uses a naive regex engine, with greedy operators and backtracking.
 
@@ -16,7 +16,7 @@ Patterns can be:
     - `lambda m: m[0] > m.next` compares the first item of the current match with the next.
 
 ```python
-from objregex import *
+from listregex import *
 
 # Matches 1 and 3, optionally with a 2 between them:
 fullmatch([1, optional(2), 3], [1, 3])
