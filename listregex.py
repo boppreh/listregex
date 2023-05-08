@@ -142,16 +142,17 @@ def optional(pattern: PatternType[Item]) -> PatternType[Item]:
         yield from _next_match(pattern, old_match)
     return wrapper
 
-def repeat(pattern: PatternType[Item], min_n: int = 1, max_n: Optional[int] = None) -> PatternType[Item]:
+def repeat(pattern: PatternType[Item], min_n: int = 1, max_n: Optional[int] = float('inf')) -> PatternType[Item]:
     """
     Repeats the pattern as many times as it'll match (greedy), if the number
-    of repetitions if above `min_n` and below `max_n` (if not None)
+    of repetitions is at least `min_n` (default 1) and at most below `max_n`
+    (default unlimited).
     """
     def wrapper(match: Match[Item]) -> Iterator[Match]:
         matches = [match]
-        for n in range(len(match.items)):
+        for n in range(min(len(match.items), max_n)):
             matches = [next_match for match in matches for next_match in _next_match(pattern, match)]
-            if min_n <= n <= (max_n if max_n is not None else n):
+            if min_n <= n <= max_n:
                 yield from matches
     return wrapper
 
