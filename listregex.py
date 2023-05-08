@@ -109,15 +109,15 @@ def _next_match(pattern: PatternType[Item], match: Match[Item]) -> Iterator[Matc
 #######################
 
 def any() -> PatternType[Item]:
-    """"Matches any single item. """
+    """" Matches any single item. """
     return lambda match: True
 
 def start() -> PatternType[Item]:
-    """ Matches the start of the items list. """
+    """ Matches the start of the item list. """
     return lambda match: match.end == 0
 
 def end() -> PatternType[Item]:
-    """ Matches the end of the items list. """
+    """ Matches the end of the item list. """
     return lambda match: match.end == len(match.items)
 
 def either(*patterns: PatternType[Item]) -> PatternType[Item]:
