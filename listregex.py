@@ -149,6 +149,8 @@ def repeat(pattern: PatternType[Item], min_n: int = 1, max_n: int | None = None)
     (default unlimited).
     """
     def wrapper(match: Match[Item]) -> Iterator[Match]:
+        nonlocal max_n
+        max_n = len(match.items) if max_n is None else max_n
         matches = [match]
         for n in range(min(len(match.items), max_n)):
             matches = [next_match for match in matches for next_match in _next_match(pattern, match)]
