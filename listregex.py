@@ -178,21 +178,23 @@ def negate(pattern: PatternType[Item]) -> PatternType[Item]:
 
 def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternType[Item]:
     """ Matches `open` until the next balanced pair of `close`. """
-    def wrapper(match: Match[Item]) -> Iterator[Match]:
-        # TODO: make it not rely on the high-level `scan` function.
-        depth = 0
-        for name, new_match in scan({'open': open, 'close': close, 'any': any()}, match.items[match.end:]):
-            if name == 'any' and depth == 0:
-                return
-            elif name == 'open':
+    def wrapper(old_match: Match[Item]) -> Iterator[Match]:
+        matches_and_depths = [(match, 1) for match in _next_match(open, old_match)]
+        while matches_and_depths:
+            match, depth = matches_and_depths.pop()
+            if new_matches := list(_next_match(open, match)):
                 depth += 1
-            elif name == 'close':
+            elif new_matches := list(_next_match(close, match)):
                 depth -= 1
-                if depth < 0:
-                    return
                 if depth == 0:
-                    yield Match(match.items, match.start, match.end + new_match.end)
-                    return
+                    yield from new_matches
+                    continue
+            elif not match.has_next:
+                continue
+            else:
+                new_matches = [match.advance(1)]
+
+            matches_and_depths.extend((match, depth) for match in new_matches)
     return wrapper
 
 ############
@@ -308,6 +310,8 @@ if __name__ == '__main__':
         assert search(repeat([1, 2]), [0, 1, 2, 1, 2, 3, 2, 4]).matched == [1, 2, 1, 2]
         assert sub([1, 2], [], [0, 1, 2, 1, 2, 3]) == [0, 3]
         assert search(matching_pair('(', ')'), 'ab(c(d()e)f)').matched == '(c(d()e)f)'
+        assert search(matching_pair('(', ')'), 'ab(c(d()e)f').matched == '(d()e)'
+        assert search(matching_pair('(', ')'), 'ab(c(d(ef') is None
 
         from datetime import date, timedelta
         from collections import namedtuple
