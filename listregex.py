@@ -43,6 +43,10 @@ class Match(Generic[Item]):
         List of all items after the matched ones.
         """
         return self.items[self.end:]
+    
+    @property
+    def n_remaining(self) -> int:
+        return len(self.items) - self.end
 
     @property
     def matched(self) -> Sequence[Item]:
