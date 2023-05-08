@@ -1,4 +1,4 @@
-from typing import Sequence, TypeVar, Any, Optional, Callable, Iterator, Union, Generic, Tuple, Dict, no_type_check
+from typing import Sequence, TypeVar, Any, Callable, Iterator, Generic, Tuple, Dict, no_type_check
 
 class NoMoreItems(Exception):
     """
@@ -64,8 +64,8 @@ class Match(Generic[Item]):
     def __repr__(self) -> str:
         return f'Match({repr(self.matched)})'
 
-LeafPatternType = Union[Item, Callable[[Match[Item]], Union[bool, int, Iterator[Match[Item]]]]]
-PatternType = Union[LeafPatternType[Item], Sequence[LeafPatternType[Item]]]
+LeafPatternType = Item | Callable[[Match[Item]], bool | int | Iterator[Match[Item]]]
+PatternType = LeafPatternType[Item] | Sequence[LeafPatternType[Item]]
 
 def _match_sequence(pattern: Sequence[LeafPatternType[Item]], match: Match[Item]) -> Iterator[Match[Item]]:
     """
@@ -142,7 +142,7 @@ def optional(pattern: PatternType[Item]) -> PatternType[Item]:
         yield from _next_match(pattern, old_match)
     return wrapper
 
-def repeat(pattern: PatternType[Item], min_n: int = 1, max_n: Optional[int] = float('inf')) -> PatternType[Item]:
+def repeat(pattern: PatternType[Item], min_n: int = 1, max_n: int | None = None) -> PatternType[Item]:
     """
     Repeats the pattern as many times as it'll match (greedy), if the number
     of repetitions is at least `min_n` (default 1) and at most below `max_n`
@@ -206,14 +206,14 @@ def scan(patterns: Dict[str, PatternType[Item]], items: Sequence[Item]) -> Itera
         yield name, Match(items, match.end, new_match.end)
         match = new_match
 
-def match(pattern: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
+def match(pattern: PatternType[Item], items: Sequence[Item]) -> Match[Item] | None:
     """
     Returns the longest match from the beginning of the items list. Use
     `fullmatch` to guarantee that the full list has been matched.
     """
     return next(_next_match(pattern, Match(items, 0, 0)))
 
-def fullmatch(pattern: PatternType[Item], items: Sequence[Item]) -> Optional[Match[Item]]:
+def fullmatch(pattern: PatternType[Item], items: Sequence[Item]) -> Match[Item] | None:
     """
     Tries to match all items with the given pattern.
     """
@@ -238,7 +238,7 @@ def findall(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Seque
     """ Returns all non-overlapping matched items from the list of items. """
     return (match.matched for match in searchall(pattern, items))
 
-def search(pattern: PatternType[Item], items: Sequence[Item], start: int = 0) -> Optional[Match[Item]]:
+def search(pattern: PatternType[Item], items: Sequence[Item], start: int = 0) -> Match[Item] | None:
     """
     Returns the first match from the list of items.
     """
