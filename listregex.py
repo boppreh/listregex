@@ -201,6 +201,12 @@ def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternT
             matches_and_depths.extend((match, depth) for match in new_matches)
     return wrapper
 
+def backreference(n: int = 0) -> PatternType[Item]:
+    """ Matches an element identical to the n-th matched item (default: first). """
+    def wrapper(match: PatternType[Item]):
+        return match[n] == match.next
+    return wrapper
+
 ############
 # Matchers #
 ############
@@ -316,6 +322,7 @@ if __name__ == '__main__':
         assert search(matching_pair('(', ')'), 'ab(c(d()e)f)').matched == '(c(d()e)f)'
         assert search(matching_pair('(', ')'), 'ab(c(d()e)f').matched == '(d()e)'
         assert search(matching_pair('(', ')'), 'ab(c(d(ef') is None
+        assert fullmatch([lambda m: m.next%2==0, any(), backreference()], [4, 1, 4])
 
         from datetime import date, timedelta
         from collections import namedtuple
