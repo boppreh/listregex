@@ -211,7 +211,7 @@ def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternT
 
 def backreference(n: int = 0) -> PatternType[Item]:
     """ Matches an element identical to the n-th matched item (default: first). """
-    def wrapper(match: PatternType[Item]):
+    def wrapper(match: Match[Item]):
         return match[n] == match.next
     return wrapper
 
