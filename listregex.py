@@ -131,6 +131,14 @@ def either(*patterns: PatternType[Item]) -> PatternType[Item]:
             yield from _next_match(pattern, old_match)
     return wrapper
 
+def both(*patterns: PatternType[Item]) -> PatternType[Item]:
+    """ Only matches if all patterns match. Returns the longest match. """
+    def wrapper(old_match: Match[Item]) -> Iterator[Match]:
+        matches_by_pattern = [set(m.end for m in _next_match(pattern, old_match)) for pattern in patterns]
+        for end in set.intersection(*matches_by_pattern):
+            yield Match(old_match.items, old_match.start, end)
+    return wrapper	
+
 def lookahead(pattern: PatternType[Item]) -> PatternType[Item]:
     """ Tests the given pattern without extending the current match. """
     def wrapper(old_match: Match[Item]) -> Iterator[Match]:
@@ -323,6 +331,7 @@ if __name__ == '__main__':
         assert search(matching_pair('(', ')'), 'ab(c(d()e)f').matched == '(d()e)'
         assert search(matching_pair('(', ')'), 'ab(c(d(ef') is None
         assert fullmatch([lambda m: m.next%2==0, any(), backreference()], [4, 1, 4])
+        assert search(both(either('a', repeat('b')), either(['b', 'b'], 'c')), 'aabbc').matched == 'bb'
 
         from datetime import date, timedelta
         from collections import namedtuple
