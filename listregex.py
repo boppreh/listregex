@@ -264,10 +264,7 @@ def search(pattern: PatternType[Item], items: Sequence[Item], start: int = 0) ->
     """
     Returns the first match from the list of items.
     """
-    for i in range(start, len(items)):
-        for match in _next_match(pattern, Match(items, i, i)):
-            return match
-    return None
+    return next((match for i in range(start, len(items)) for match in _next_match(pattern, Match(items, i, i))), None)
 
 def sub(pattern: PatternType[Item], replacement: Sequence[Item], items: Sequence[Item], count: int = 0) -> Sequence[Item]:
     """
