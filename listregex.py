@@ -2,7 +2,7 @@ from typing import Sequence, TypeVar, Any, Callable, Iterator, Generic, Tuple, D
 
 class NoMoreItems(Exception):
     """
-    Error raised when calling "match.next" at no more items are available.
+    Error raised when calling "match.next" at the end of the list.
     """
 
 Item = TypeVar("Item")
@@ -189,7 +189,7 @@ def negate(pattern: PatternType[Item]) -> PatternType[Item]:
     return wrapper
 
 def matching_pair(open: PatternType[Item], close: PatternType[Item]) -> PatternType[Item]:
-    """ Matches `open` until the next balanced pair of `close`. """
+    """ Matches from `open` to the next balanced pair of `close`. """
     def wrapper(old_match: Match[Item]) -> Iterator[Match]:
         matches_and_depths = [(match, 1) for match in _next_match(open, old_match)]
         while matches_and_depths:
@@ -244,7 +244,7 @@ def fullmatch(pattern: PatternType[Item], items: Sequence[Item]) -> Match[Item] 
             return match
     return None
 
-def searchall(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Match[Item]]:
+def finditer(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Match[Item]]:
     """
     Returns all non-overlapping matches from the list of items.
     """
@@ -258,7 +258,7 @@ def searchall(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Mat
 
 def findall(pattern: PatternType[Item], items: Sequence[Item]) -> Iterator[Sequence[Item]]:
     """ Returns all non-overlapping matched items from the list of items. """
-    return (match.matched for match in searchall(pattern, items))
+    return (match.matched for match in finditer(pattern, items))
 
 def search(pattern: PatternType[Item], items: Sequence[Item], start: int = 0) -> Match[Item] | None:
     """
@@ -281,7 +281,7 @@ def subn(pattern: PatternType[Item], replacement: Sequence[Item], items: Sequenc
     the items list with replacements applied and number of replacements made.
     """
     items_copy = list(items)
-    matches = list(searchall(pattern, items))
+    matches = list(finditer(pattern, items))
     if count > 0:
         matches = matches[:count]
     for match in reversed(matches):
@@ -298,7 +298,7 @@ def split(pattern: PatternType[Item], items: Sequence[Item], maxsplit: int = 0) 
     `maxsplit` times (unless zero). The matched items themselves are not
     included.
     """
-    matches = list(searchall(pattern, items))
+    matches = list(finditer(pattern, items))
     if maxsplit > 0:
         matches = matches[:maxsplit]
     last_end = 0
