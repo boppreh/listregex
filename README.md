@@ -1,14 +1,15 @@
 # listregex
 
-`listregex` implements the same functions as Python's stdlib `re` module, but instead of operating only on strings, it operates on lists of arbitrary objects.
+`listregex` implements the same functions as Python's stdlib `re` module (and a few more), but instead of operating only on strings, it operates on lists of arbitrary objects. If you've found yourself writing awkward code to extract subsequences from a list, and thought to yourself "this would be a tiny regex if my list was a string", then this is the library.
 
-Currently uses a naive regex engine, with greedy operators and backtracking.
+This is not a high-speed regex engine, as it currently uses naive backtracking in pure Python. On the other hand, there's greater flexibility in the patterns allowed, and even a mechanism for arbitrary tests.
 
 Patterns can be:
 
-- A literal value. Example: `search(1, [1, 2])` matches the first value.
-- A list/tuple of patterns, where the sub-patterns are matched sequentially. Example: `search([1, 2], [0, 1, 2])`.
-- A value from a helper function, such as `optional(pattern)`, `zero_or_more(pattern)`, `end()`. Example: `findall(repeat(1), my_list)` finds all strings of 1's.
+- A single literal value. Example: `search(pattern=1, items=[1, 2])` matches `[1]`.
+- A list/tuple of patterns, where the sub-patterns are matched sequentially. Example: `search([1, 2], [0, 1, 2])` matches `[1, 2]`.
+- A value from a helper function, such as `optional(pattern)`, `zero_or_more(pattern)`, `end()`, etc. Example: `findall(repeat(1), my_list)` finds all sequences of 1's.
+- Any combination of the above. Example: `search(pattern=[1, repeat(negate(3)), 1], items=[0, 2, 1, 3, 1, 2, 1, 0])` matches `[1, 2, 1]`.
 - A function that takes one parameter, the current match, and returns the number of following items that should be added to be match (note that `True == 1` and `False == 0`). Returning 0 means no match and the engine backtracks. Examples:
     - `lambda m: 2` blindly accepts the next two items, such that `findall(lambda m: 2, items)` returns the items divided in pairs.
     - `lambda m: m.next % 2 == 0` checks if the next item is even, and if so, extends the match to include it.
